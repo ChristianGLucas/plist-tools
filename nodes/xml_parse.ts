@@ -45,11 +45,24 @@ function textContent(node: any): string {
 
 export function parseXmlPlist(xml: string): PlistValue {
   const parseErrors: string[] = [];
-  const doc = new DOMParser({
-    onError: (level: string, msg: string) => {
-      parseErrors.push(`${level}: ${msg}`);
-    },
-  }).parseFromString(xml, 'text/xml');
+  // @xmldom/xmldom's own documented behavior: a `fatalError` (e.g. an
+  // unclosed tag) is BOTH reported to `onError` AND thrown synchronously
+  // as a raw ParseError, bypassing the onError-then-check pattern below.
+  // That raw exception must be caught here and converted to the same
+  // structured error a `warning`/`error`-level issue gets -- otherwise a
+  // completely ordinary malformed document (a truncated download, a paste
+  // error) escapes as an uncaught exception instead of the documented
+  // `error` field.
+  let doc: ReturnType<DOMParser['parseFromString']>;
+  try {
+    doc = new DOMParser({
+      onError: (level: string, msg: string) => {
+        parseErrors.push(`${level}: ${msg}`);
+      },
+    }).parseFromString(xml, 'text/xml');
+  } catch (e) {
+    fail('MALFORMED_XML', `XML parse error: ${(e as Error).message}`);
+  }
 
   if (parseErrors.length > 0) {
     fail('MALFORMED_XML', `XML parse error(s): ${parseErrors.join('; ')}`);

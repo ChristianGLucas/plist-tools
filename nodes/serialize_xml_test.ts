@@ -48,4 +48,21 @@ describe('SerializeXml', () => {
     const result = serializeXml(testContext, input);
     expect(result.getError()?.getCode()).toBe('MISSING_ROOT');
   });
+
+  // Regression: xmlbuilder's `.txt()` throws a plain (non-PtNodeError)
+  // Error for a string containing an XML-1.0-illegal control character
+  // (e.g. U+0001) -- plausible for a STRING value that originated from
+  // corrupted or binary-ish source data. That raw throw escaped
+  // serializeXmlPlist uncaught until it wrapped the whole build in its
+  // own try/catch.
+  it('returns a structured error, not a throw, for a string with an XML-illegal control character', () => {
+    const value = new PlistValue();
+    value.setType(T.STRING);
+    value.setStringValue('bad\x01char');
+    const input = new SerializeXmlRequest();
+    input.setRoot(value);
+    const result = serializeXml(testContext, input);
+    expect(result.getError()).toBeDefined();
+    expect(result.getXml()).toBe('');
+  });
 });

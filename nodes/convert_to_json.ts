@@ -7,7 +7,8 @@ import { plistToJsonText } from './json_convert';
  * Convert a parsed PlistValue tree to plain JSON text. Mapping notes:
  * DATE becomes an RFC3339 string, DATA becomes a base64 string, INTEGER
  * becomes a JSON number when it fits exactly in a JS double
- * (abs(value) <= 2^53) and a decimal STRING otherwise -- JSON has no
+ * (abs(value) <= Number.MAX_SAFE_INTEGER, i.e. 2^53 - 1) and a decimal
+ * STRING otherwise -- JSON has no
  * arbitrary-precision integer type, so a huge plist integer is kept exact
  * as a string rather than silently rounded.
  */

@@ -61,4 +61,13 @@ describe('JsonToXml', () => {
     const result = convert('{not valid json');
     expect(result.getError()?.getCode()).toBe('INVALID_JSON');
   });
+
+  // Regression (same root cause as SerializeXml's control-character test):
+  // a JSON string value containing an XML-illegal control character must
+  // not escape the internal serializeXmlPlist call as an uncaught throw.
+  it('returns a structured error, not a throw, for a JSON string with an XML-illegal control character', () => {
+    const result = convert(JSON.stringify({ A: 'bad\x01char' }));
+    expect(result.getError()).toBeDefined();
+    expect(result.getXml()).toBe('');
+  });
 });

@@ -78,6 +78,21 @@ describe('ParseXml', () => {
     expect(result.getError()?.getCode()).toBe('MALFORMED_XML');
   });
 
+  // Regression: @xmldom/xmldom's DOMParser both reports a `fatalError` to
+  // `onError` AND throws it synchronously as a raw exception for something
+  // as ordinary as an unclosed tag (a truncated download, a paste error).
+  // That raw throw bypassed the onError-collected-errors check entirely
+  // and escaped as an uncaught exception (surfaced by the platform as a
+  // bare, undocumented `{"error": "unclosed xml tag(s): ..."}` string
+  // instead of this node's documented {value?, error?:{code,message}}
+  // shape) until parseXmlPlist wrapped the parseFromString call itself in
+  // its own try/catch.
+  it('returns a structured error, not a throw, for an unclosed tag', () => {
+    const result = parse('<?xml version="1.0"?><plist version="1.0"><string>hi');
+    expect(result.getError()?.getCode()).toBe('MALFORMED_XML');
+    expect(result.getValue()).toBeUndefined();
+  });
+
   it('does not leak local file content through an external XML entity (XXE)', () => {
     const secretPath = '/etc/hostname';
     const secretContent = fs.readFileSync(secretPath, 'utf8').trim();

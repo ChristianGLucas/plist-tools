@@ -202,8 +202,9 @@ message ExtractByTypeResult {
 
 // Convert a PlistValue tree to plain JSON text. Mapping notes: DATE becomes
 // an RFC3339 string, DATA becomes a base64 string, INTEGER becomes a JSON
-// number when it fits exactly in a JS double (|value| <= 2^53) and a
-// decimal STRING otherwise (JSON has no arbitrary-precision integer type;
+// number when it fits exactly in a JS double (|value| <= Number.
+// MAX_SAFE_INTEGER, i.e. 2^53 - 1) and a decimal STRING otherwise (JSON
+// has no arbitrary-precision integer type;
 // silently narrowing a huge integer to a lossy number would be a bug, not
 // a convenience) — check whether a given integer round-tripped through the
 // numeric case with GetValueType/inspection of the source if exactness

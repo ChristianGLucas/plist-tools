@@ -12,7 +12,7 @@
 
 import * as xmlbuilder from 'xmlbuilder';
 import { PlistValue } from '../gen/messages_pb';
-import { fail, isValidDecimalInteger, MAX_TREE_DEPTH } from './helpers';
+import { fail, isValidDecimalInteger, MAX_TREE_DEPTH, PtNodeError } from './helpers';
 
 const T = PlistValue.PlistType;
 
@@ -77,9 +77,26 @@ function writeValue(value: PlistValue, parent: xmlbuilder.XMLElement, depth: num
 }
 
 export function serializeXmlPlist(root: PlistValue): string {
-  const doc = xmlbuilder.create('plist', { version: '1.0', encoding: 'UTF-8' });
-  doc.dtd('-//Apple//DTD PLIST 1.0//EN', 'http://www.apple.com/DTDs/PropertyList-1.0.dtd');
-  doc.att('version', '1.0');
-  writeValue(root, doc, 0);
-  return doc.end({ pretty: true });
+  // xmlbuilder itself throws a plain Error (not a PtNodeError) for input it
+  // cannot represent in XML text at all -- notably a string containing an
+  // XML-1.0-illegal control character (e.g. U+0001), which is entirely
+  // plausible for a STRING value that originated from corrupted or
+  // binary-ish source data. Every xmlbuilder call happens inside
+  // writeValue's tree walk, so wrapping the whole walk here converts any
+  // such library exception into this package's documented structured
+  // error rather than letting it escape uncaught. A PtNodeError raised by
+  // this file's own explicit checks (fail(...) above) passes through
+  // unchanged -- it is already the right shape.
+  try {
+    const doc = xmlbuilder.create('plist', { version: '1.0', encoding: 'UTF-8' });
+    doc.dtd('-//Apple//DTD PLIST 1.0//EN', 'http://www.apple.com/DTDs/PropertyList-1.0.dtd');
+    doc.att('version', '1.0');
+    writeValue(root, doc, 0);
+    return doc.end({ pretty: true });
+  } catch (e) {
+    if (e instanceof PtNodeError) {
+      throw e;
+    }
+    fail('XML_BUILD_ERROR', `could not build XML: ${(e as Error).message}`);
+  }
 }

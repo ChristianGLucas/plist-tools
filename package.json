@@ -2,6 +2,7 @@
   "name": "christiangeorgelucas-plist-tools",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "main": "dist/service.js",
   "scripts": {
     "build": "tsc"
