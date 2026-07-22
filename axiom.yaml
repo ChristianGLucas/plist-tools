@@ -1,0 +1,193 @@
+name: christiangeorgelucas/plist-tools
+version: 0.1.0
+language: typescript
+author: Christian George Lucas
+license: MIT
+description: >-
+  Deterministic parsing and inspection of Apple Property List (plist)
+  files — both the XML plist format and the binary plist (bplist00)
+  format — for macOS/iOS development tooling: Info.plist, entitlements,
+  provisioning profiles, preferences, LaunchAgents. Every node is a pure,
+  stateless, single-input-to-single-output transform over a canonical
+  typed PlistValue tree (mirroring Apple's own STRING/INTEGER/REAL/
+  BOOLEAN/DATE/DATA/DICT/ARRAY model), so parsing nodes and the many
+  downstream inspection/extraction nodes compose freely. Covers the
+  surface liberally: format detection from magic bytes, XML and binary
+  parsing, XML serialization, dotted key-path lookup and single-level key
+  extraction, value-type inspection, recursive key-path listing, extract-
+  all-values-of-a-type, JSON conversion both directions, common
+  Info.plist field extraction (bundle id/version/name, URL schemes,
+  NS*UsageDescription keys), well-formedness validation, and structure
+  summarization. The plist is always supplied by the caller as text or
+  bytes — no filesystem, no network, no wall clock, no randomness; a
+  plist `date` value is only ever read from the input, never generated.
+  XML parsing has no external-entity/DTD-fetch capability (no XXE) and
+  rejects any parse error rather than returning a partial tree; every
+  input is size-bounded before parsing begins; malformed input always
+  returns a structured error, never a crash. The binary-plist and
+  XML-plist integer decoders are custom (see ParseBinary/ParseXml) after
+  discovering that the standard JS libraries for both formats silently
+  corrupt integers outside limited ranges on realistic input — every
+  integer here is decoded with arbitrary-precision arithmetic and carried
+  as an exact decimal string.
+tags:
+  - apple
+  - plist
+  - macos
+  - ios
+  - xcode
+  - info-plist
+  - entitlements
+  - provisioning-profile
+  - bplist
+  - xml
+
+nodes:
+    - name: DetectFormat
+      input: DetectFormatRequest
+      output: DetectFormatResult
+      description: >-
+        Detect whether a raw file's content is an XML plist or a binary
+        plist (bplist), from its leading bytes: the literal 8-byte magic
+        "bplist00" for binary, or a "<?xml"/"<plist"/"<!DOCTYPE plist"
+        opening (after skipping a leading BOM/whitespace) for XML. Returns
+        format "unknown" for anything else — this node never errors.
+    - name: ParseXml
+      input: XmlPlistRequest
+      output: ParseResult
+      description: >-
+        Parse an XML property list document into the canonical PlistValue
+        tree. Disables external-entity/DTD resolution by construction (no
+        XXE) and rejects the input on any XML parse error or warning
+        rather than returning a partial tree. Every <integer> is carried
+        through as an exact decimal string rather than a JS number, so
+        values beyond 2^53 (e.g. a nanosecond-epoch timestamp) never lose
+        precision. Malformed input never throws — it comes back with
+        `error` set.
+    - name: ParseBinary
+      input: BinaryPlistRequest
+      output: ParseResult
+      description: >-
+        Parse a binary property list (bplist00) document into the
+        canonical PlistValue tree. `data` is the raw binary plist bytes
+        (JSON-transported as base64). Every integer is decoded with
+        arbitrary-precision arithmetic and carried as an exact decimal
+        string — unlike the standard JS binary-plist parser on npm, which
+        silently corrupts any 4-byte integer >= 2^31 or 8-byte integer
+        outside the signed 32-bit range (verified against real
+        plistlib-produced binary plists; both magnitudes occur in
+        ordinary real-world data, e.g. any negative number, which is
+        always written at 8-byte width). Malformed input never throws —
+        it comes back with `error` set.
+    - name: SerializeXml
+      input: SerializeXmlRequest
+      output: SerializeXmlResult
+      description: >-
+        Serialize a PlistValue tree (e.g. one built by ParseXml,
+        ParseBinary, or JsonToXml's internal conversion) back into an
+        Apple XML plist document. Dispatches strictly on each value's
+        declared `type`, so a REAL that happens to hold a whole number
+        (e.g. 98.0) still round-trips as <real>, never silently as
+        <integer>. Malformed input never throws — it comes back with
+        `error` set.
+    - name: GetValueAtPath
+      input: KeyPathRequest
+      output: KeyPathResult
+      description: >-
+        Look up a value at a dot-separated key path through a parsed
+        PlistValue tree, e.g.
+        "CFBundleURLTypes.0.CFBundleURLSchemes.0" — a dict segment is
+        matched as a literal key, an array segment must be a
+        non-negative decimal index. `found` is false (not an error) when
+        the path is well-formed but nothing is there. A literal "."
+        inside a dict key cannot be expressed this way; use ExtractKey
+        for that case.
+    - name: ExtractKey
+      input: ExtractKeyRequest
+      output: ExtractKeyResult
+      description: >-
+        Extract a single key's value from a dict, one level deep — the
+        key is matched literally, including any "." it contains (unlike
+        GetValueAtPath's dotted paths). `error` is set when `root` is not
+        a DICT; `found` is false (not an error) when the key is simply
+        absent.
+    - name: ListTopLevelKeys
+      input: ListTopLevelKeysRequest
+      output: ListTopLevelKeysResult
+      description: >-
+        List the top-level keys of a dict PlistValue, in source order.
+        `error` is set when `root` is not a DICT.
+    - name: GetValueType
+      input: GetValueTypeRequest
+      output: GetValueTypeResult
+      description: >-
+        Get the PlistType of a value (e.g. one already extracted via
+        GetValueAtPath or ExtractKey) — STRING, INTEGER, REAL, BOOLEAN,
+        DATE, DATA, DICT, ARRAY, or NULL_VALUE, matching plist's own
+        typed value model. Never errors: an unset `value` comes back as
+        UNKNOWN.
+    - name: ListAllKeysRecursive
+      input: ListAllKeysRequest
+      output: ListAllKeysResult
+      description: >-
+        Recursively flatten every key path in the document — both
+        container nodes (dicts/arrays) and leaves — depth-first in source
+        order, each tagged with its PlistType. The "what's in this
+        plist" node. Bounded to 200 levels of nesting; deeper input
+        returns a structured error rather than exhausting the stack.
+    - name: ExtractValuesByType
+      input: ExtractByTypeRequest
+      output: ExtractByTypeResult
+      description: >-
+        Extract every value of a given PlistType anywhere in the tree
+        (e.g. every DATA or DATE leaf), each tagged with the dot-path
+        where it was found.
+    - name: ConvertToJson
+      input: ConvertToJsonRequest
+      output: ConvertToJsonResult
+      description: >-
+        Convert a parsed PlistValue tree to plain JSON text. Mapping:
+        DATE becomes an RFC3339 string, DATA becomes a base64 string,
+        INTEGER becomes a JSON number when it fits exactly in a JS double
+        (abs(value) <= 2^53) and a decimal STRING otherwise, since JSON
+        has no arbitrary-precision integer type and silently rounding a
+        huge plist integer would be a bug, not a convenience.
+    - name: JsonToXml
+      input: JsonToXmlRequest
+      output: JsonToXmlResult
+      description: >-
+        Convert JSON text directly to an XML plist document. Type
+        inference: string -> STRING, boolean -> BOOLEAN, null ->
+        NULL_VALUE, a whole-number JSON number -> INTEGER, a fractional
+        JSON number -> REAL, object -> DICT (key order preserved), array
+        -> ARRAY. JSON cannot express plist's DATE or DATA types, so this
+        conversion never produces them.
+    - name: GetInfoPlistSummary
+      input: InfoPlistSummaryRequest
+      output: InfoPlistSummaryResult
+      description: >-
+        Extract the common Info.plist fields, when present, from a parsed
+        PlistValue tree: CFBundleIdentifier, CFBundleVersion,
+        CFBundleShortVersionString, CFBundleName, CFBundleDisplayName,
+        every URL scheme declared across CFBundleURLTypes, and every
+        recognized permission-usage-description key
+        (NS*UsageDescription). `root` must be a DICT.
+        `recognized_fields_found` is a convenience signal, not a hard
+        validity gate.
+    - name: ValidatePlist
+      input: ValidateRequest
+      output: ValidateResult
+      description: >-
+        Validate that a document is a well-formed plist — either the XML
+        or binary form, whichever `source` supplies — and report issues.
+        Runs the same parser ParseXml/ParseBinary use, so "valid" here
+        means those nodes will actually succeed on this input.
+    - name: SummarizeStructure
+      input: SummarizeRequest
+      output: SummarizeResult
+      description: >-
+        Count keys and summarize a PlistValue tree's structure: total
+        dict-entry count across every nested dict, maximum nesting depth
+        (a bare scalar root is depth 1), dict/array node counts, and a
+        full breakdown of every value — including container nodes
+        themselves — by PlistType.
