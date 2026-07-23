@@ -5,7 +5,7 @@ both the XML plist format and the binary plist (bplist00) format. Built for
 macOS/iOS development tooling: Info.plist, entitlements, provisioning
 profiles, preferences, LaunchAgents.
 
-Built for the [Axiom](https://axiom.co) marketplace, published as
+Built for the [Axiom](https://axiomide.com) marketplace, published as
 `christiangeorgelucas/plist-tools`.
 
 ## What it does
