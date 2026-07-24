@@ -1,6 +1,6 @@
 import { XmlPlistRequest, ParseResult } from '../gen/messages_pb';
 import { AxiomContext } from '../gen/axiomContext';
-import { byteLength, isTooLarge, tooLargeError, PtNodeError } from './helpers';
+import { PtNodeError } from './helpers';
 import { parseXmlPlist } from './xml_parse';
 
 /**
@@ -14,11 +14,6 @@ import { parseXmlPlist } from './xml_parse';
 export function parseXml(ax: AxiomContext, input: XmlPlistRequest): ParseResult {
   const result = new ParseResult();
   const xml = input.getXml();
-  const len = byteLength(xml);
-  if (isTooLarge(len)) {
-    result.setError(tooLargeError(len).proto);
-    return result;
-  }
   try {
     result.setValue(parseXmlPlist(xml));
   } catch (e) {

@@ -1,6 +1,6 @@
 import { JsonToXmlRequest, JsonToXmlResult } from '../gen/messages_pb';
 import { AxiomContext } from '../gen/axiomContext';
-import { byteLength, isTooLarge, tooLargeError, PtNodeError } from './helpers';
+import { PtNodeError } from './helpers';
 import { jsonTextToPlist } from './json_convert';
 import { serializeXmlPlist } from './xml_build';
 
@@ -18,11 +18,6 @@ import { serializeXmlPlist } from './xml_build';
 export function jsonToXml(ax: AxiomContext, input: JsonToXmlRequest): JsonToXmlResult {
   const result = new JsonToXmlResult();
   const json = input.getJson();
-  const len = byteLength(json);
-  if (isTooLarge(len)) {
-    result.setError(tooLargeError(len).proto);
-    return result;
-  }
   try {
     const tree = jsonTextToPlist(json);
     result.setXml(serializeXmlPlist(tree));

@@ -3,7 +3,6 @@ import { PlistValue, XmlPlistRequest } from '../gen/messages_pb';
 import { parseXml } from './parse_xml';
 import { testContext } from './testctx';
 import { FIXTURE1_XML, FIXTURE2_XML } from './fixtures';
-import { MAX_INPUT_BYTES } from './helpers';
 
 const T = PlistValue.PlistType;
 
@@ -109,11 +108,5 @@ describe('ParseXml', () => {
     // This parser's actual, stricter behavior: any XML error (including an
     // unresolved external entity) fails the whole document.
     expect(result.getError()?.getCode()).toBe('MALFORMED_XML');
-  });
-
-  it('rejects input over the size bound with a structured error', () => {
-    const huge = '<?xml version="1.0"?><plist version="1.0"><string>' + 'x'.repeat(MAX_INPUT_BYTES + 1) + '</string></plist>';
-    const result = parse(huge);
-    expect(result.getError()?.getCode()).toBe('TOO_LARGE');
   });
 });

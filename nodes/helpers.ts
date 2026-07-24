@@ -7,15 +7,6 @@ import { PlistValue, PlistEntry, Error as PtError } from '../gen/messages_pb';
 
 // ── Bounds (input -> cost) ─────────────────────────────────────────────────
 //
-// Every node caps its raw input (XML text bytes, binary plist bytes, or
-// JSON text bytes) at this many bytes, checked before any parsing begins.
-// Axiom's transport caps a node message around ~4 MiB; a base64-encoded
-// binary plist inflates ~4/3 over its raw size before it even reaches this
-// process, so 3 MiB of *decoded* bytes here is already a generous ceiling
-// relative to that outer limit, while still bounding cost as a function of
-// the one dimension every node here takes from the caller: byte length.
-export const MAX_INPUT_BYTES = 3 * 1024 * 1024;
-
 // Recursion/nesting-depth bound applied while WALKING an already-parsed
 // PlistValue tree (ListAllKeysRecursive, ExtractValuesByType, ConvertToJson,
 // SerializeXml, SummarizeStructure) and while building a tree from XML/JSON.
@@ -32,10 +23,6 @@ export const MAX_PATH_SEGMENTS = 200;
 
 export function byteLength(text: string): number {
   return Buffer.byteLength(text, 'utf8');
-}
-
-export function isTooLarge(byteLen: number): boolean {
-  return byteLen > MAX_INPUT_BYTES;
 }
 
 // ── Error contract ──────────────────────────────────────────────────────
@@ -63,13 +50,6 @@ export function mkError(code: string, message: string): PtError {
 
 export function fail(code: string, message: string): never {
   throw new PtNodeError(code, message);
-}
-
-export function tooLargeError(byteLen: number): PtNodeError {
-  return new PtNodeError(
-    'TOO_LARGE',
-    `input is ${byteLen} bytes, exceeding the ${MAX_INPUT_BYTES} byte limit`,
-  );
 }
 
 // ── PlistValue construction ────────────────────────────────────────────

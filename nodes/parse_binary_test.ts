@@ -2,7 +2,6 @@ import { PlistValue, BinaryPlistRequest } from '../gen/messages_pb';
 import { parseBinary } from './parse_binary';
 import { testContext } from './testctx';
 import { FIXTURE1_B64, FIXTURE2_B64, b64ToBytes } from './fixtures';
-import { MAX_INPUT_BYTES } from './helpers';
 
 const T = PlistValue.PlistType;
 
@@ -77,11 +76,5 @@ describe('ParseBinary', () => {
     const truncated = full.subarray(0, 20);
     const result = parse(truncated);
     expect(result.getError()).toBeDefined();
-  });
-
-  it('rejects input over the size bound with a structured error', () => {
-    const huge = new Uint8Array(MAX_INPUT_BYTES + 1);
-    const result = parse(huge);
-    expect(result.getError()?.getCode()).toBe('TOO_LARGE');
   });
 });

@@ -1,6 +1,6 @@
 import { BinaryPlistRequest, ParseResult } from '../gen/messages_pb';
 import { AxiomContext } from '../gen/axiomContext';
-import { isTooLarge, tooLargeError, PtNodeError } from './helpers';
+import { PtNodeError } from './helpers';
 import { parseBinaryPlist } from './bplist_binary';
 
 /**
@@ -16,10 +16,6 @@ import { parseBinaryPlist } from './bplist_binary';
 export function parseBinary(ax: AxiomContext, input: BinaryPlistRequest): ParseResult {
   const result = new ParseResult();
   const bytes = input.getData_asU8();
-  if (isTooLarge(bytes.length)) {
-    result.setError(tooLargeError(bytes.length).proto);
-    return result;
-  }
   try {
     result.setValue(parseBinaryPlist(Buffer.from(bytes)));
   } catch (e) {

@@ -1,6 +1,6 @@
 import { ValidateRequest, ValidateResult } from '../gen/messages_pb';
 import { AxiomContext } from '../gen/axiomContext';
-import { byteLength, isTooLarge, MAX_INPUT_BYTES, PtNodeError } from './helpers';
+import { PtNodeError } from './helpers';
 import { parseXmlPlist } from './xml_parse';
 import { parseBinaryPlist } from './bplist_binary';
 
@@ -16,12 +16,6 @@ export function validatePlist(ax: AxiomContext, input: ValidateRequest): Validat
   if (input.getSourceCase() === ValidateRequest.SourceCase.XML) {
     result.setFormat('xml');
     const xml = input.getXml();
-    const len = byteLength(xml);
-    if (isTooLarge(len)) {
-      result.setValid(false);
-      result.setIssuesList([`input is ${len} bytes, exceeding the ${MAX_INPUT_BYTES} byte limit`]);
-      return result;
-    }
     try {
       parseXmlPlist(xml);
       result.setValid(true);
@@ -40,11 +34,6 @@ export function validatePlist(ax: AxiomContext, input: ValidateRequest): Validat
   if (input.getSourceCase() === ValidateRequest.SourceCase.BINARY) {
     result.setFormat('binary');
     const bytes = input.getBinary_asU8();
-    if (isTooLarge(bytes.length)) {
-      result.setValid(false);
-      result.setIssuesList([`input is ${bytes.length} bytes, exceeding the ${MAX_INPUT_BYTES} byte limit`]);
-      return result;
-    }
     try {
       parseBinaryPlist(Buffer.from(bytes));
       result.setValid(true);

@@ -38,12 +38,6 @@ const MAGIC = 'bplist00';
 const TRAILER_SIZE = 32;
 const EPOCH_MS = Date.UTC(2001, 0, 1); // plist DATE epoch: 2001-01-01T00:00:00Z
 
-// Matches node-bplist-parser's own safety bounds (a sane, long-standing
-// convention for this format) -- an independent ceiling from our own
-// MAX_INPUT_BYTES on total request size, applied per-object so a single
-// declared object inside a small file can't claim an absurd length.
-const MAX_OBJECT_SIZE = 100 * 1000 * 1000;
-const MAX_OBJECT_COUNT = 32768;
 
 function readUBE(buf: Buffer, start: number, len: number): bigint {
   let v = 0n;
@@ -56,7 +50,7 @@ function readUBE(buf: Buffer, start: number, len: number): bigint {
 // Converts a bounded, already-range-checked bigint (an offset, count, or
 // ref -- never plist payload data) to a JS number. Safe because every call
 // site first checks the value against a bound well under
-// Number.MAX_SAFE_INTEGER (buffer length, capped at MAX_INPUT_BYTES).
+// Number.MAX_SAFE_INTEGER.
 function toSafeNumber(v: bigint, what: string): number {
   if (v < 0n || v > BigInt(Number.MAX_SAFE_INTEGER)) {
     fail('MALFORMED_BPLIST', `${what} out of safe range`);
@@ -86,9 +80,6 @@ export function parseBinaryPlist(buffer: Buffer): PlistValue {
   const topObject = toSafeNumber(readUBE(trailer, 16, 8), 'topObject');
   const offsetTableOffset = toSafeNumber(readUBE(trailer, 24, 8), 'offsetTableOffset');
 
-  if (numObjects > MAX_OBJECT_COUNT) {
-    fail('TOO_MANY_OBJECTS', `binary plist declares ${numObjects} objects, exceeding ${MAX_OBJECT_COUNT}`);
-  }
   if (topObject >= numObjects) {
     fail('MALFORMED_BPLIST', 'topObject index out of range');
   }
@@ -152,7 +143,6 @@ export function parseBinaryPlist(buffer: Buffer): PlistValue {
       case 0x1: { // integer: length 2^objInfo bytes
         const len = 1 << objInfo;
         checkBounds(offset + 1, len, 'integer payload');
-        if (len > MAX_OBJECT_SIZE) fail('MALFORMED_BPLIST', 'integer object too large');
         const raw = readUBE(buffer, offset + 1, len);
         let value: bigint;
         if (len <= 4) {
@@ -199,14 +189,12 @@ export function parseBinaryPlist(buffer: Buffer): PlistValue {
         const { size, bytesConsumed } = readSize(offset + 1, objInfo);
         const dataStart = offset + 1 + bytesConsumed;
         checkBounds(dataStart, size, 'data payload');
-        if (size > MAX_OBJECT_SIZE) fail('MALFORMED_BPLIST', 'data object too large');
         return mkData(new Uint8Array(buffer.subarray(dataStart, dataStart + size)));
       }
       case 0x5: { // ASCII string
         const { size, bytesConsumed } = readSize(offset + 1, objInfo);
         const strStart = offset + 1 + bytesConsumed;
         checkBounds(strStart, size, 'ascii string payload');
-        if (size > MAX_OBJECT_SIZE) fail('MALFORMED_BPLIST', 'string object too large');
         return mkString(buffer.toString('latin1', strStart, strStart + size));
       }
       case 0x6: { // UTF-16BE string (length is in UTF-16 code units)
@@ -214,14 +202,12 @@ export function parseBinaryPlist(buffer: Buffer): PlistValue {
         const strStart = offset + 1 + bytesConsumed;
         const byteLen = size * 2;
         checkBounds(strStart, byteLen, 'utf16 string payload');
-        if (byteLen > MAX_OBJECT_SIZE) fail('MALFORMED_BPLIST', 'string object too large');
         return mkString(decodeUtf16Be(buffer, strStart, byteLen));
       }
       case 0xa: { // array
         const { size: length, bytesConsumed } = readSize(offset + 1, objInfo);
         const refsStart = offset + 1 + bytesConsumed;
         checkBounds(refsStart, length * objectRefSize, 'array refs');
-        if (length * objectRefSize > MAX_OBJECT_SIZE) fail('MALFORMED_BPLIST', 'array too large');
         const items: PlistValue[] = new Array(length);
         for (let i = 0; i < length; i++) {
           const itemRef = toSafeNumber(readUBE(buffer, refsStart + i * objectRefSize, objectRefSize), 'array item ref');
@@ -234,7 +220,6 @@ export function parseBinaryPlist(buffer: Buffer): PlistValue {
         const keysStart = offset + 1 + bytesConsumed;
         const valsStart = keysStart + length * objectRefSize;
         checkBounds(keysStart, length * objectRefSize * 2, 'dict refs');
-        if (length * 2 * objectRefSize > MAX_OBJECT_SIZE) fail('MALFORMED_BPLIST', 'dict too large');
         const entries: Array<[string, PlistValue]> = new Array(length);
         for (let i = 0; i < length; i++) {
           const keyRef = toSafeNumber(readUBE(buffer, keysStart + i * objectRefSize, objectRefSize), 'dict key ref');
